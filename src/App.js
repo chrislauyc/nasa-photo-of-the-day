@@ -1,9 +1,10 @@
 import React, {useState,useEffect} from "react";
 import axios from "axios";
 import "./App.css";
+
 import {BASE_URL,API_KEY} from "./constants";
 import Header from './components/Header';
-import APOD from './pages/APOD';
+import Page from './pages/Page';
 // import Footer from './components/Footer';
 const makePage = (longName,shortName,data)=>{
   return{
@@ -12,48 +13,74 @@ const makePage = (longName,shortName,data)=>{
     data
   };
 };
-// const pages = [
-//   makePage('Astronomy Picture of the Day','APOD'),
-//   makePage('Curiosity Rover','Curiosity'),
-//   makePage('Opportunity Rover','Opportunity'),
-//   makePage('Spirit Rover','Spirit')
-// ]
 const roverNames = ['curiosity','opportunity','spirit'];
-const roverArgs = {
-  sol:1000
-};
 function App() {
-  const [pages, setPages] = useState([]);
-  // const [currentPage, setCurrentPage] = useState(0);
+  const [pages, setPages] = useState([]);  
+  const [currentPage, setCurrentPage] = useState(null);
+  const [sol,setSol] = useState(0);
+  let tempPages = pages;
   useEffect(()=>{
-    
-    const fetchdata = (setFunction,baseUrl,args) =>{
-        args['api_key'] = API_KEY;
-        let query = Object.keys(args).map((k)=>`${k}=${args[k]}`).join('&');
-        axios.get(`${baseUrl}?${query}`)
-        .then(({data})=>{
-          setFunction(data);
-        })
-        .catch((err)=>console.log(err));
-    };
-    let tempPages = [];
-
-    roverNames.forEach((roverName)=>{
-      fetchdata((data)=>tempPages.push(makePage(`${roverName} rover`,`${roverName}`,data)),`${BASE_URL}/mars-photos/api/v1/rovers/${roverName}/photos`,roverArgs);
-    });
-
+    // fetching data for pages***
+    // APOD data
     fetchdata((data)=>{
-      tempPages.push(makePage('Astronomy Picture of the Day','APOD',data));
-      //call setPages at the end
-      setPages([...pages,...tempPages]);
+      tempPages = updatePages(tempPages,makePage('Astronomy Picture of the Day','APOD',data));
+      setCurrentPage('APOD');
+      setPages(tempPages);
     },`${BASE_URL}/planetary/apod`,{});
+
+    // *** 
   },[]);
-  console.log('render pages',pages);
+  useEffect(()=>{
+    // rover data
+    roverNames.forEach((roverName)=>{
+      fetchdata((picsData)=>{
+        fetchdata((manifestData)=>{
+          let tempPage = makePage(`${roverName} rover`,`${roverName}`,picsData);
+          tempPage.maxSol = manifestData.photo_manifest.max_sol;
+          tempPage.sol = sol;
+          tempPage.setSol = setSol;
+          tempPages = updatePages(tempPages,tempPage);
+          setPages(tempPages);
+        },`${BASE_URL}/mars-photos/api/v1/manifests/${roverName}`,{});
+      },`${BASE_URL}/mars-photos/api/v1/rovers/${roverName}/photos`,{sol:sol});
+    });
+  },[sol]);
+  const fetchdata = (setFunction,baseUrl,args) =>{
+    args['api_key'] = API_KEY;
+    let query = Object.keys(args).map((k)=>`${k}=${args[k]}`).join('&');
+    axios.get(`${baseUrl}?${query}`)
+    .then(({data})=>{
+      setFunction(data);
+    })
+    .catch((err)=>console.log(err));
+  };
+  function updatePages(pages,newPage){
+    const oldPage = pages.find((page)=>newPage.shortName===page.shortName);
+    if(!oldPage){
+      return[...pages,newPage];
+    }
+    else{
+      return pages.map((page)=>{
+        if(page.shortName === newPage.shortName){
+          return newPage;
+        }
+        else{
+          return page;
+        }
+      });
+    }
+  }
+  function navClick(shortName){
+    setCurrentPage(shortName);
+  }
+  function getPage(shortName){
+    return pages.find((page)=>page.shortName===shortName);
+  }
   return (
     <div className="App">
-      <Header pages={pages} currentPage={pages.findIndex((page)=>page.shortName==='APOD')} />
+      <Header pages={pages} currentPage={currentPage} getPage={getPage} navClick={navClick} />
       <main>
-        <APOD page={pages.find((page)=>page.shortName==='APOD')}/>
+        <Page page={getPage(currentPage)}/>
       </main>
     </div>
   );
