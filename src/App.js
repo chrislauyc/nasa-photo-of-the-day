@@ -5,7 +5,6 @@ import "./App.css";
 import {BASE_URL,API_KEY} from "./constants";
 import Header from './components/Header';
 import Page from './pages/Page';
-// import Footer from './components/Footer';
 const makePage = (longName,shortName,data)=>{
   return{
     longName,
